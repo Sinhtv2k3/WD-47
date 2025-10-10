@@ -26,8 +26,6 @@ a:hover {
 
 body {
   margin: 0;
-  display: flex;
-  place-items: center;
   min-width: 320px;
   min-height: 100vh;
 }
@@ -67,4 +65,28 @@ button:focus-visible {
   button {
     background-color: #f9f9f9;
   }
+}
+
+/* Admin sidebar custom styles */
+.admin-sider .ant-menu-dark.ant-menu-inline .ant-menu-item {
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+.admin-sider .ant-menu-dark .ant-menu-item:hover {
+  background-color: rgba(255, 255, 255, 0.12);
+}
+
+.admin-sider .ant-menu-dark .ant-menu-item-selected {
+  background: linear-gradient(90deg, rgba(22,119,255,0.28) 0%, rgba(22,119,255,0.12) 100%);
+}
+
+.admin-sider .ant-menu-dark .ant-menu-item-selected a,
+.admin-sider .ant-menu-dark .ant-menu-item a:hover,
+.admin-sider .ant-menu-dark .ant-menu-item-selected .anticon,
+.admin-sider .ant-menu-dark .ant-menu-item:hover .anticon {
+  color: #ffffff;
+}
+
+.admin-sider .ant-menu-dark .ant-menu-item .anticon {
+  font-size: 16px;
 }

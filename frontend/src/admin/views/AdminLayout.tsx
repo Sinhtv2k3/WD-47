@@ -1,5 +1,12 @@
 import React from 'react';
 import { Layout, Menu, theme } from 'antd';
+import {
+  DashboardOutlined,
+  CalendarOutlined,
+  ScissorOutlined,
+  TeamOutlined,
+  UserOutlined,
+} from '@ant-design/icons';
 import { Link, Outlet, useLocation} from 'react-router-dom';
 
 const { Header, Sider, Content } = Layout;
@@ -13,18 +20,39 @@ export const AdminLayout: React.FC = () => {
 
   return (
     <Layout style={{ minHeight: '100vh' }}>
-      <Sider breakpoint="lg" collapsedWidth="0">
+      <Sider breakpoint="lg" collapsedWidth="0" className="admin-sider">
         <div style={{ height: 48, margin: 16, color: '#fff', fontWeight: 700 }}>Barber Admin</div>
         <Menu
           theme="dark"
           mode="inline"
           selectedKeys={[selectedKey]}
+          className="admin-menu"
           items={[
-            { key: 'dashboard', label: <Link to="/admin">Dashboard</Link> },
-            { key: 'appointments', label: <Link to="/admin/appointments">Lịch hẹn</Link> },
-            { key: 'services', label: <Link to="/admin/services">Dịch vụ</Link> },
-            { key: 'stylists', label: <Link to="/admin/stylists">Thợ cắt</Link> },
-            { key: 'customers', label: <Link to="/admin/customers">Khách hàng</Link> },
+            {
+              key: 'dashboard',
+              icon: <DashboardOutlined />,
+              label: <Link to="/admin">Dashboard</Link>,
+            },
+            {
+              key: 'appointments',
+              icon: <CalendarOutlined />,
+              label: <Link to="/admin/appointments">Lịch hẹn</Link>,
+            },
+            {
+              key: 'services',
+              icon: <ScissorOutlined />,
+              label: <Link to="/admin/services">Dịch vụ</Link>,
+            },
+            {
+              key: 'stylists',
+              icon: <TeamOutlined />,
+              label: <Link to="/admin/stylists">Thợ cắt</Link>,
+            },
+            {
+              key: 'customers',
+              icon: <UserOutlined />,
+              label: <Link to="/admin/customers">Khách hàng</Link>,
+            },
           ]}
         />
       </Sider>

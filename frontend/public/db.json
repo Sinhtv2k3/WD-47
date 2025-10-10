@@ -1,0 +1,88 @@
+{
+  "customers": [
+    {
+      "id": "1",
+      "name": "Nguyễn Văn A",
+      "email": "a.nguyen@example.com",
+      "phone": "0901-234-567",
+      "address": "12 Lê Lợi, Q.1, TP.HCM"
+    },
+    {
+      "id": "2",
+      "name": "Trần Thị B",
+      "email": "b.tran@example.com",
+      "phone": "0908-111-222",
+      "address": "89 Hai Bà Trưng, Q.3, TP.HCM"
+    },
+    {
+      "id": "3",
+      "name": "Phạm C",
+      "email": "c.pham@example.com",
+      "phone": "0909-333-444",
+      "address": "45 Nguyễn Huệ, Q.1, TP.HCM"
+    },
+    {
+      "id": "4",
+      "name": "Nguyễn Văn A",
+      "email": "a.nguyen@example.com",
+      "phone": "0901-234-567",
+      "address": "12 Lê Lợi, Q.1, TP.HCM"
+    },
+    {
+      "id": "5",
+      "name": "Trần Thị B",
+      "email": "b.tran@example.com",
+      "phone": "0908-111-222",
+      "address": "89 Hai Bà Trưng, Q.3, TP.HCM"
+    },
+    {
+      "id": "6",
+      "name": "Phạm C",
+      "email": "c.pham@example.com",
+      "phone": "0909-333-444",
+      "address": "45 Nguyễn Huệ, Q.1, TP.HCM"
+    },
+    {
+      "id": "7",
+      "name": "Nguyễn Văn A",
+      "email": "a.nguyen@example.com",
+      "phone": "0901-234-567",
+      "address": "12 Lê Lợi, Q.1, TP.HCM"
+    },
+    {
+      "id": "8",
+      "name": "Trần Thị B",
+      "email": "b.tran@example.com",
+      "phone": "0908-111-222",
+      "address": "89 Hai Bà Trưng, Q.3, TP.HCM"
+    },
+    {
+      "id": "9",
+      "name": "Phạm C",
+      "email": "c.pham@example.com",
+      "phone": "0909-333-444",
+      "address": "45 Nguyễn Huệ, Q.1, TP.HCM"
+    },
+    {
+      "id": "10",
+      "name": "Nguyễn Văn A",
+      "email": "a.nguyen@example.com",
+      "phone": "0901-234-567",
+      "address": "12 Lê Lợi, Q.1, TP.HCM"
+    },
+    {
+      "id": "11",
+      "name": "Trần Thị B",
+      "email": "b.tran@example.com",
+      "phone": "0908-111-222",
+      "address": "89 Hai Bà Trưng, Q.3, TP.HCM"
+    },
+    {
+      "id": "12",
+      "name": "Phạm C",
+      "email": "c.pham@example.com",
+      "phone": "0909-333-444",
+      "address": "45 Nguyễn Huệ, Q.1, TP.HCM"
+    }
+  ]
+}
