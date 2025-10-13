@@ -6,6 +6,7 @@ import 'antd/dist/reset.css';
 import { createBrowserRouter, RouterProvider, Navigate } from 'react-router-dom';
 import { AdminLayout, DashboardHome, Appointments, Services, Stylists, Customers } from './admin';
 import { UserHome } from './user';
+import CustomerDetail from './admin/views/CustomerDetail';
 
 const router = createBrowserRouter([
   {
@@ -25,6 +26,7 @@ const router = createBrowserRouter([
       { path: 'services', element: <Services /> },
       { path: 'stylists', element: <Stylists /> },
       { path: 'customers', element: <Customers /> },
+      { path: 'customers/:id', element: <CustomerDetail /> },
     ],
   },
   { path: '*', element: <Navigate to="/user" replace /> },

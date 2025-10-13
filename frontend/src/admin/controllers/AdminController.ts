@@ -21,7 +21,7 @@ export class AdminController {
     return res.json();
   }
 
-  static async updateCustomer(id: string, payload: Omit<CustomerDto, 'id'>): Promise<CustomerDto> {
+  static async updateCustomer(id: number, payload: Partial<Omit<CustomerDto, 'id'>>): Promise<CustomerDto> {
     const res = await fetch(`${BASE}/customers/${id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
@@ -31,7 +31,7 @@ export class AdminController {
     return res.json();
   }
 
-  static async deleteCustomer(id: string): Promise<void> {
+  static async deleteCustomer(id: number): Promise<void> {
     const res = await fetch(`${BASE}/customers/${id}`, { method: 'DELETE' });
     if (!res.ok) throw new Error('Failed to delete customer');
   }
