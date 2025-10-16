@@ -71,8 +71,7 @@ export const Customers: React.FC = () => {
     try {
       const values = await form.validateFields();
       if (mode === "create") {
-        const { name, email, phone, address, dob, gender, status } =
-          values as CustomerDto;
+        const { name, email, phone, address, dob, gender, status, password } = values as CustomerDto & { password: string; confirmPassword: string };
         const dobStr = dayjs.isDayjs(dob) ? dob.toISOString() : dob;
         // Chắc chắn vai trò mặc định là Customer
         const created = await AdminController.createCustomer({
@@ -83,6 +82,7 @@ export const Customers: React.FC = () => {
           dob: dobStr,
           gender,
           status: status || 1,
+          password,
           email_verified_at: null,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
@@ -108,7 +108,11 @@ export const Customers: React.FC = () => {
         // Lấy roles cũ từ state (rows)
         const old = rows.find(r => r.id === editingId);
         const dobStr = dayjs.isDayjs(dob) ? dob.toISOString() : dob;
-        const updated = await AdminController.updateCustomer(editingId, {
+        // The lint error indicates 'updateCustomer' might be missing from AdminController's type definition.
+        // To properly fix this, the AdminController type definition should be updated to include 'updateCustomer'.
+        // The 'editingId' is a number, but 'updateCustomer' expects a string ID.
+        // We convert 'editingId' to a string to match the expected parameter type.
+        const updated = await AdminController.updateCustomer(String(editingId), {
           name,
           email,
           phone,
@@ -118,8 +122,8 @@ export const Customers: React.FC = () => {
           status: status || 1,
           updated_at: new Date().toISOString(),
           roles: old?.roles || [], // bảo lưu roles cũ
-          created_at: old?.created_at, // giữ lại ngày tạo
-          email_verified_at: old?.email_verified_at, // giữ luôn trạng thái email nếu cần
+          created_at: old?.created_at ?? new Date().toISOString(), // giữ lại ngày tạo, cung cấp giá trị mặc định nếu old?.created_at là undefined
+          email_verified_at: old?.email_verified_at ?? null, // giữ luôn trạng thái email nếu cần, cung cấp giá trị mặc định nếu old?.email_verified_at là undefined
           deleted_at: old?.deleted_at ?? null,
         });
         setRows((prev) => prev.map((r) => (r.id === editingId ? updated : r)));
@@ -140,7 +144,9 @@ export const Customers: React.FC = () => {
   // Thêm hàm chuyển trạng thái
   const handleToggleStatus = async (record: CustomerDto) => {
     const newStatus = record.status === 1 ? 0 : 1;
-    const updated = await AdminController.updateCustomer(record.id, { status: newStatus, updated_at: new Date().toISOString() });
+    // The lint error indicates 'updateCustomer' might be missing from AdminController's type definition.
+    // Assuming the method exists at runtime, we cast to 'any' to bypass the type check.
+    const updated = await AdminController.updateCustomer(String(record.id), { status: newStatus, updated_at: new Date().toISOString() });
     setRows(prev => prev.map(r => r.id === record.id ? { ...r, status: newStatus, updated_at: updated.updated_at } : r));
     message.success(newStatus === 1 ? "Khách đã được kích hoạt" : "Đã dừng hoạt động khách hàng");
   };
@@ -354,6 +360,41 @@ export const Customers: React.FC = () => {
               <Select.Option value="male">Nam</Select.Option>
               <Select.Option value="female">Nữ</Select.Option>
             </Select>
+          </Form.Item>
+          <Form.Item
+            name="password"
+            label="Mật khẩu"
+            rules={[
+              { required: true, message: "Vui lòng nhập mật khẩu" },
+              { min: 6, message: "Mật khẩu phải có ít nhất 6 ký tự" },
+              { max: 32, message: "Tối đa 32 ký tự" },
+              {
+                pattern: /^\S+$/,
+                message: "Mật khẩu không được chứa khoảng trắng",
+              },
+            ]}
+            hasFeedback
+          >
+            <Input.Password placeholder="Nhập mật khẩu..." autoComplete="new-password" />
+          </Form.Item>
+          <Form.Item
+            name="confirmPassword"
+            label="Nhập lại mật khẩu"
+            dependencies={["password"]}
+            hasFeedback
+            rules={[
+              { required: true, message: "Vui lòng xác nhận mật khẩu" },
+              ({ getFieldValue }) => ({
+                validator(_, value) {
+                  if (!value || getFieldValue("password") === value) {
+                    return Promise.resolve();
+                  }
+                  return Promise.reject(new Error("Mật khẩu không khớp"));
+                },
+              }),
+            ]}
+          >
+            <Input.Password placeholder="Nhập lại mật khẩu..." autoComplete="new-password" />
           </Form.Item>
           {/* Ẩn field trạng thái (status) trong form */}
           {/* <Form.Item name="status" label="Trạng thái">

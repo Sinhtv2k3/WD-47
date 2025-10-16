@@ -28,5 +28,6 @@ export interface CustomerDto {
   updated_at: string;
   deleted_at: string | null;
   roles: Role[];
+  password?: string;
 }
 
