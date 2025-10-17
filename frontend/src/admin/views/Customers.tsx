@@ -11,11 +11,18 @@ import {
   Select,
   DatePicker,
   Tag,
+  Row,
+  Col,
 } from "antd";
 import { AdminController } from "../controllers/AdminController";
 import type { CustomerDto } from "../models/AdminModel";
 import { Link } from "react-router-dom";
 import dayjs from "dayjs";
+import isBetween from "dayjs/plugin/isBetween";
+dayjs.extend(isBetween);
+import type { Dayjs } from "dayjs";
+
+import { DatePicker as AntdDatePicker } from "antd";
 
 // Remote data handled by AdminController
 
@@ -27,12 +34,23 @@ export const Customers: React.FC = () => {
   const [loading, setLoading] = React.useState<boolean>(false);
   const [editingId, setEditingId] = React.useState<number | null>(null);
 
+  // State cho filter
+  const [searchId, setSearchId] = React.useState("");
+  const [searchName, setSearchName] = React.useState("");
+  const [searchEmail, setSearchEmail] = React.useState("");
+  // Range dạng [moment, moment]
+  const [searchCreatedRange, setSearchCreatedRange] = React.useState<[Dayjs | null, Dayjs | null]>([null, null]);
+
   React.useEffect(() => {
     let mounted = true;
     const load = async () => {
       setLoading(true);
       try {
         const customers = await AdminController.getCustomers();
+        customers?.sort(
+          (a, b) =>
+            new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+        );
         if (mounted) setRows(customers ?? []);
       } catch (err) {
         console.error("Failed to load /db.json", err);
@@ -46,6 +64,29 @@ export const Customers: React.FC = () => {
       mounted = false;
     };
   }, []);
+
+  // Derived rows sau lọc
+  const filteredRows = React.useMemo(() => {
+    return rows.filter(row => {
+      // Filter theo ID
+      if (searchId && !String(row.id).includes(searchId.trim())) return false;
+      // Filter theo tên
+      if (searchName && !(row.name?.toLowerCase().includes(searchName.trim().toLowerCase()))) return false;
+      // Filter theo email
+      if (searchEmail && !(row.email?.toLowerCase().includes(searchEmail.trim().toLowerCase()))) return false;
+      // Filter theo range created_at
+      if (
+        searchCreatedRange &&
+        searchCreatedRange[0] &&
+        searchCreatedRange[1]
+      ) {
+        const from = searchCreatedRange[0].startOf("day");
+        const to = searchCreatedRange[1].endOf("day");
+        if (!row.created_at || !dayjs(row.created_at).isBetween(from, to, undefined, "[]")) return false;
+      }
+      return true;
+    });
+  }, [rows, searchId, searchName, searchEmail, searchCreatedRange]);
 
   const handleAddClick = () => {
     setMode("create");
@@ -71,7 +112,8 @@ export const Customers: React.FC = () => {
     try {
       const values = await form.validateFields();
       if (mode === "create") {
-        const { name, email, phone, address, dob, gender, status, password } = values as CustomerDto & { password: string; confirmPassword: string };
+        const { name, email, phone, address, dob, gender, status, password } =
+          values as CustomerDto & { password: string; confirmPassword: string };
         const dobStr = dayjs.isDayjs(dob) ? dob.toISOString() : dob;
         // Chắc chắn vai trò mặc định là Customer
         const created = await AdminController.createCustomer({
@@ -106,26 +148,29 @@ export const Customers: React.FC = () => {
         const { name, email, phone, address, dob, gender, status } =
           values as CustomerDto;
         // Lấy roles cũ từ state (rows)
-        const old = rows.find(r => r.id === editingId);
+        const old = rows.find((r) => r.id === editingId);
         const dobStr = dayjs.isDayjs(dob) ? dob.toISOString() : dob;
         // The lint error indicates 'updateCustomer' might be missing from AdminController's type definition.
         // To properly fix this, the AdminController type definition should be updated to include 'updateCustomer'.
         // The 'editingId' is a number, but 'updateCustomer' expects a string ID.
         // We convert 'editingId' to a string to match the expected parameter type.
-        const updated = await AdminController.updateCustomer(String(editingId), {
-          name,
-          email,
-          phone,
-          address,
-          dob: dobStr,
-          gender,
-          status: status || 1,
-          updated_at: new Date().toISOString(),
-          roles: old?.roles || [], // bảo lưu roles cũ
-          created_at: old?.created_at ?? new Date().toISOString(), // giữ lại ngày tạo, cung cấp giá trị mặc định nếu old?.created_at là undefined
-          email_verified_at: old?.email_verified_at ?? null, // giữ luôn trạng thái email nếu cần, cung cấp giá trị mặc định nếu old?.email_verified_at là undefined
-          deleted_at: old?.deleted_at ?? null,
-        });
+        const updated = await AdminController.updateCustomer(
+          String(editingId),
+          {
+            name,
+            email,
+            phone,
+            address,
+            dob: dobStr,
+            gender,
+            status: status || 1,
+            updated_at: new Date().toISOString(),
+            roles: old?.roles || [], // bảo lưu roles cũ
+            created_at: old?.created_at ?? new Date().toISOString(), // giữ lại ngày tạo, cung cấp giá trị mặc định nếu old?.created_at là undefined
+            email_verified_at: old?.email_verified_at ?? null, // giữ luôn trạng thái email nếu cần, cung cấp giá trị mặc định nếu old?.email_verified_at là undefined
+            deleted_at: old?.deleted_at ?? null,
+          }
+        );
         setRows((prev) => prev.map((r) => (r.id === editingId ? updated : r)));
         message.success("Đã cập nhật khách hàng");
       }
@@ -146,9 +191,22 @@ export const Customers: React.FC = () => {
     const newStatus = record.status === 1 ? 0 : 1;
     // The lint error indicates 'updateCustomer' might be missing from AdminController's type definition.
     // Assuming the method exists at runtime, we cast to 'any' to bypass the type check.
-    const updated = await AdminController.updateCustomer(String(record.id), { status: newStatus, updated_at: new Date().toISOString() });
-    setRows(prev => prev.map(r => r.id === record.id ? { ...r, status: newStatus, updated_at: updated.updated_at } : r));
-    message.success(newStatus === 1 ? "Khách đã được kích hoạt" : "Đã dừng hoạt động khách hàng");
+    const updated = await AdminController.updateCustomer(String(record.id), {
+      status: newStatus,
+      updated_at: new Date().toISOString(),
+    });
+    setRows((prev) =>
+      prev.map((r) =>
+        r.id === record.id
+          ? { ...r, status: newStatus, updated_at: updated.updated_at }
+          : r
+      )
+    );
+    message.success(
+      newStatus === 1
+        ? "Khách đã được kích hoạt"
+        : "Đã dừng hoạt động khách hàng"
+    );
   };
 
   return (
@@ -177,19 +235,61 @@ export const Customers: React.FC = () => {
         </Button>
       </div>
 
-      {/* Tầng 2: Thanh tìm kiếm */}
-      <div style={{ marginBottom: 16 }}>
-        <Input.Search
-          placeholder="Tìm khách theo tên, SĐT, email..."
-          allowClear
-          size="large"
-        />
-      </div>
+      {/* Tầng 2: Thanh tìm kiếm tách biệt */}
+      <Row gutter={16} style={{ marginBottom: 16, width: "100%" }}>
+        <Col xs={24} sm={12} md={6} lg={4} xl={3}>
+          <Input
+            placeholder="ID"
+            value={searchId}
+            onChange={e => setSearchId(e.target.value)}
+            allowClear
+          />
+        </Col>
+        <Col xs={24} sm={12} md={6} lg={6} xl={5}>
+          <Input
+            placeholder="Tên khách hàng"
+            value={searchName}
+            onChange={e => setSearchName(e.target.value)}
+            allowClear
+          />
+        </Col>
+        <Col xs={24} sm={12} md={6} lg={7} xl={6}>
+          <Input
+            placeholder="Email"
+            value={searchEmail}
+            onChange={e => setSearchEmail(e.target.value)}
+            allowClear
+          />
+        </Col>
+        <Col xs={24} sm={12} md={6} lg={7} xl={8}>
+          <AntdDatePicker.RangePicker
+            value={searchCreatedRange}
+            onChange={dates => setSearchCreatedRange(dates ?? [null, null])}
+            allowClear
+            style={{ width: "100%" }}
+            format="DD/MM/YYYY"
+            placeholder={["Từ ngày", "Đến ngày"]}
+          />
+        </Col>
+        <Col xs={24} sm={24} md={24} lg={24} xl={2} style={{ minWidth: 110 }}>
+          <Button
+            style={{ width: "100%" }}
+            onClick={() => {
+              setSearchId("");
+              setSearchName("");
+              setSearchEmail("");
+              setSearchCreatedRange([null, null]);
+            }}
+          >
+            Xóa bộ lọc
+          </Button>
+        </Col>
+      </Row>
 
       {/* Tầng 3: Bảng dữ liệu */}
       <Table
         rowKey="id"
-        dataSource={rows}
+        dataSource={filteredRows}
         columns={[
           {
             title: "ID",
@@ -258,7 +358,7 @@ export const Customers: React.FC = () => {
             dataIndex: "created_at",
             width: 120,
             render: (date: string) => {
-              if (!date || isNaN(new Date(date).getTime())) return '';
+              if (!date || isNaN(new Date(date).getTime())) return "";
               return new Date(date).toLocaleDateString("vi-VN");
             },
           },
@@ -268,13 +368,23 @@ export const Customers: React.FC = () => {
             fixed: "right" as const,
             render: (_, record: CustomerDto) => (
               <Space>
-                <Button size="small" type="link" onClick={() => handleEditClick(record)}>Sửa</Button>
-                <Button size="small" type="link" danger={record.status === 1}
-                  onClick={() => handleToggleStatus(record)}>
+                <Button
+                  size="small"
+                  type="link"
+                  onClick={() => handleEditClick(record)}
+                >
+                  Sửa
+                </Button>
+                <Button
+                  size="small"
+                  type="link"
+                  danger={record.status === 1}
+                  onClick={() => handleToggleStatus(record)}
+                >
                   {record.status === 1 ? "Chặn" : "Kích hoạt"}
                 </Button>
               </Space>
-            )
+            ),
           },
         ]}
         pagination={{ pageSize: 10, position: ["bottomCenter"] }}
@@ -375,7 +485,10 @@ export const Customers: React.FC = () => {
             ]}
             hasFeedback
           >
-            <Input.Password placeholder="Nhập mật khẩu..." autoComplete="new-password" />
+            <Input.Password
+              placeholder="Nhập mật khẩu..."
+              autoComplete="new-password"
+            />
           </Form.Item>
           <Form.Item
             name="confirmPassword"
@@ -394,7 +507,10 @@ export const Customers: React.FC = () => {
               }),
             ]}
           >
-            <Input.Password placeholder="Nhập lại mật khẩu..." autoComplete="new-password" />
+            <Input.Password
+              placeholder="Nhập lại mật khẩu..."
+              autoComplete="new-password"
+            />
           </Form.Item>
           {/* Ẩn field trạng thái (status) trong form */}
           {/* <Form.Item name="status" label="Trạng thái">
