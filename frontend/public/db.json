@@ -1,0 +1,38 @@
+{
+    "services": [{
+            "name": "nhuộm tóc",
+            "description": "Thay đổi màu tóc, đổi mới bản thân – mỗi lọn tóc là một câu chuyện riêng\n",
+            "price": 100000,
+            "status": "active",
+            "id": "1"
+        },
+        {
+            "name": "cắt tóc",
+            "description": "Một cái cắt tóc mới, một phiên bản mới của chính mình",
+            "price": 100000,
+            "status": "active",
+            "id": "2"
+        },
+        {
+            "name": "gội đầu",
+            "description": "Gội đầu không chỉ là làm sạch, mà là chăm sóc chính mình",
+            "price": 100000,
+            "status": "active",
+            "id": "3"
+        },
+        {
+            "name": "massage",
+            "description": "Gội đầu không chỉ là làm sạch, mà là chăm sóc chính mình",
+            "price": 100000,
+            "status": "active",
+            "id": "4"
+        },
+        {
+            "id": "8c50",
+            "name": "nhuộm tóc1",
+            "description": "323",
+            "price": 13123123,
+            "status": "active"
+        }
+    ]
+}
