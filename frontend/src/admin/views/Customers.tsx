@@ -6,23 +6,14 @@ import {
   Table,
   Drawer,
   Form,
-  // Popconfirm,
-  message,
-  Select,
-  DatePicker,
-  Tag,
   Row,
   Col,
+  Select,
 } from "antd";
 import { AdminController } from "../controllers/AdminController";
 import type { CustomerDto } from "../models/AdminModel";
 import { Link } from "react-router-dom";
-import dayjs from "dayjs";
-import isBetween from "dayjs/plugin/isBetween";
-dayjs.extend(isBetween);
-import type { Dayjs } from "dayjs";
-
-import { DatePicker as AntdDatePicker } from "antd";
+import "./Customers.css";
 
 // Remote data handled by AdminController
 
@@ -33,13 +24,10 @@ export const Customers: React.FC = () => {
   const [rows, setRows] = React.useState<CustomerDto[]>([]);
   const [loading, setLoading] = React.useState<boolean>(false);
   const [editingId, setEditingId] = React.useState<number | null>(null);
-
-  // State cho filter
+  // Filter state
   const [searchId, setSearchId] = React.useState("");
   const [searchName, setSearchName] = React.useState("");
   const [searchEmail, setSearchEmail] = React.useState("");
-  // Range dạng [moment, moment]
-  const [searchCreatedRange, setSearchCreatedRange] = React.useState<[Dayjs | null, Dayjs | null]>([null, null]);
 
   React.useEffect(() => {
     let mounted = true;
@@ -47,13 +35,9 @@ export const Customers: React.FC = () => {
       setLoading(true);
       try {
         const customers = await AdminController.getCustomers();
-        customers?.sort(
-          (a, b) =>
-            new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-        );
         if (mounted) setRows(customers ?? []);
       } catch (err) {
-        console.error("Failed to load /db.json", err);
+        console.error("Failed to load customers", err);
         if (mounted) setRows([]);
       } finally {
         if (mounted) setLoading(false);
@@ -65,28 +49,14 @@ export const Customers: React.FC = () => {
     };
   }, []);
 
-  // Derived rows sau lọc
   const filteredRows = React.useMemo(() => {
     return rows.filter(row => {
-      // Filter theo ID
       if (searchId && !String(row.id).includes(searchId.trim())) return false;
-      // Filter theo tên
-      if (searchName && !(row.name?.toLowerCase().includes(searchName.trim().toLowerCase()))) return false;
-      // Filter theo email
-      if (searchEmail && !(row.email?.toLowerCase().includes(searchEmail.trim().toLowerCase()))) return false;
-      // Filter theo range created_at
-      if (
-        searchCreatedRange &&
-        searchCreatedRange[0] &&
-        searchCreatedRange[1]
-      ) {
-        const from = searchCreatedRange[0].startOf("day");
-        const to = searchCreatedRange[1].endOf("day");
-        if (!row.created_at || !dayjs(row.created_at).isBetween(from, to, undefined, "[]")) return false;
-      }
+      if (searchName && !(row.user?.name?.toLowerCase().includes(searchName.trim().toLowerCase()))) return false;
+      if (searchEmail && !(row.user?.email?.toLowerCase().includes(searchEmail.trim().toLowerCase()))) return false;
       return true;
     });
-  }, [rows, searchId, searchName, searchEmail, searchCreatedRange]);
+  }, [rows, searchId, searchName, searchEmail]);
 
   const handleAddClick = () => {
     setMode("create");
@@ -97,11 +67,7 @@ export const Customers: React.FC = () => {
 
   const handleEditClick = (record: CustomerDto) => {
     setMode("edit");
-    // Nếu record.dob có dữ liệu, chuyển sang dayjs, ngược lại giữ nguyên
-    form.setFieldsValue({
-      ...record,
-      dob: record.dob ? dayjs(record.dob) : undefined,
-    });
+    form.setFieldsValue({ ...record });
     setEditingId(record.id);
     setOpen(true);
   };
@@ -112,67 +78,11 @@ export const Customers: React.FC = () => {
     try {
       const values = await form.validateFields();
       if (mode === "create") {
-        const { name, email, phone, address, dob, gender, status, password } =
-          values as CustomerDto & { password: string; confirmPassword: string };
-        const dobStr = dayjs.isDayjs(dob) ? dob.toISOString() : dob;
-        // Chắc chắn vai trò mặc định là Customer
-        const created = await AdminController.createCustomer({
-          name,
-          email,
-          phone,
-          address,
-          dob: dobStr,
-          gender,
-          status: status || 1,
-          password,
-          email_verified_at: null,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-          deleted_at: null,
-          roles: [
-            {
-              id: 1,
-              name: "Customer",
-              created_at: new Date().toISOString(),
-              updated_at: new Date().toISOString(),
-              pivot: {
-                user_id: Date.now(), // Hoặc sẽ được backend/mock cập nhật lại đúng sau
-                role_id: 1,
-              },
-            },
-          ],
-        });
-        setRows((prev) => [created, ...prev]);
-        message.success("Đã thêm khách hàng");
+        const created = await AdminController.createCustomer(values as Omit<CustomerDto, "id">);
+        setRows(prev => [created, ...prev]);
       } else if (mode === "edit" && editingId) {
-        const { name, email, phone, address, dob, gender, status } =
-          values as CustomerDto;
-        // Lấy roles cũ từ state (rows)
-        const old = rows.find((r) => r.id === editingId);
-        const dobStr = dayjs.isDayjs(dob) ? dob.toISOString() : dob;
-        // The lint error indicates 'updateCustomer' might be missing from AdminController's type definition.
-        // To properly fix this, the AdminController type definition should be updated to include 'updateCustomer'.
-        // The 'editingId' is a number, but 'updateCustomer' expects a string ID.
-        // We convert 'editingId' to a string to match the expected parameter type.
-        const updated = await AdminController.updateCustomer(
-          String(editingId),
-          {
-            name,
-            email,
-            phone,
-            address,
-            dob: dobStr,
-            gender,
-            status: status || 1,
-            updated_at: new Date().toISOString(),
-            roles: old?.roles || [], // bảo lưu roles cũ
-            created_at: old?.created_at ?? new Date().toISOString(), // giữ lại ngày tạo, cung cấp giá trị mặc định nếu old?.created_at là undefined
-            email_verified_at: old?.email_verified_at ?? null, // giữ luôn trạng thái email nếu cần, cung cấp giá trị mặc định nếu old?.email_verified_at là undefined
-            deleted_at: old?.deleted_at ?? null,
-          }
-        );
-        setRows((prev) => prev.map((r) => (r.id === editingId ? updated : r)));
-        message.success("Đã cập nhật khách hàng");
+        const updated = await AdminController.updateCustomer(String(editingId), values as Partial<Omit<CustomerDto, "id">>);
+        setRows(prev => prev.map(r => (r.id === editingId ? updated : r)));
       }
       setOpen(false);
     } catch {
@@ -180,113 +90,28 @@ export const Customers: React.FC = () => {
     }
   };
 
-  // const handleDelete = async (record: CustomerDto) => {
-  //   await AdminController.deleteCustomer(record.id);
-  //   setRows((prev) => prev.filter((r) => r.id !== record.id));
-  //   message.success("Đã xóa khách hàng");
-  // };
-
-  // Thêm hàm chuyển trạng thái
-  const handleToggleStatus = async (record: CustomerDto) => {
-    const newStatus = record.status === 1 ? 0 : 1;
-    // The lint error indicates 'updateCustomer' might be missing from AdminController's type definition.
-    // Assuming the method exists at runtime, we cast to 'any' to bypass the type check.
-    const updated = await AdminController.updateCustomer(String(record.id), {
-      status: newStatus,
-      updated_at: new Date().toISOString(),
-    });
-    setRows((prev) =>
-      prev.map((r) =>
-        r.id === record.id
-          ? { ...r, status: newStatus, updated_at: updated.updated_at }
-          : r
-      )
-    );
-    message.success(
-      newStatus === 1
-        ? "Khách đã được kích hoạt"
-        : "Đã dừng hoạt động khách hàng"
-    );
-  };
-
   return (
     <div style={{ width: "100%" }}>
-      {/* Tầng 1: Tiêu đề bên trái, nút thêm bên phải */}
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          marginBottom: 16,
-        }}
-      >
-        <h2
-          style={{
-            margin: 0,
-            fontSize: 20,
-            fontWeight: 600,
-            whiteSpace: "nowrap",
-          }}
-        >
-          Quản lý khách hàng
-        </h2>
-        <Button type="primary" size="large" onClick={handleAddClick}>
-          Thêm khách
-        </Button>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+        <h2 style={{ margin: 0, fontSize: 20, fontWeight: 600, whiteSpace: "nowrap" }}>Quản lý khách hàng</h2>
+        <Button type="primary" size="large" onClick={handleAddClick}>Thêm khách</Button>
       </div>
-
-      {/* Tầng 2: Thanh tìm kiếm tách biệt */}
       <Row gutter={16} style={{ marginBottom: 16, width: "100%" }}>
         <Col xs={24} sm={12} md={6} lg={4} xl={3}>
-          <Input
-            placeholder="ID"
-            value={searchId}
-            onChange={e => setSearchId(e.target.value)}
-            allowClear
-          />
+          <Input placeholder="ID" value={searchId} onChange={e => setSearchId(e.target.value)} allowClear />
         </Col>
         <Col xs={24} sm={12} md={6} lg={6} xl={5}>
-          <Input
-            placeholder="Tên khách hàng"
-            value={searchName}
-            onChange={e => setSearchName(e.target.value)}
-            allowClear
-          />
+          <Input placeholder="Tên khách hàng" value={searchName} onChange={e => setSearchName(e.target.value)} allowClear />
         </Col>
         <Col xs={24} sm={12} md={6} lg={7} xl={6}>
-          <Input
-            placeholder="Email"
-            value={searchEmail}
-            onChange={e => setSearchEmail(e.target.value)}
-            allowClear
-          />
-        </Col>
-        <Col xs={24} sm={12} md={6} lg={7} xl={8}>
-          <AntdDatePicker.RangePicker
-            value={searchCreatedRange}
-            onChange={dates => setSearchCreatedRange(dates ?? [null, null])}
-            allowClear
-            style={{ width: "100%" }}
-            format="DD/MM/YYYY"
-            placeholder={["Từ ngày", "Đến ngày"]}
-          />
+          <Input placeholder="Email" value={searchEmail} onChange={e => setSearchEmail(e.target.value)} allowClear />
         </Col>
         <Col xs={24} sm={24} md={24} lg={24} xl={2} style={{ minWidth: 110 }}>
-          <Button
-            style={{ width: "100%" }}
-            onClick={() => {
-              setSearchId("");
-              setSearchName("");
-              setSearchEmail("");
-              setSearchCreatedRange([null, null]);
-            }}
-          >
-            Xóa bộ lọc
-          </Button>
+          <Button style={{ width: "100%" }} onClick={() => {
+            setSearchId(""); setSearchName(""); setSearchEmail("");
+          }}>Xóa bộ lọc</Button>
         </Col>
       </Row>
-
-      {/* Tầng 3: Bảng dữ liệu */}
       <Table
         rowKey="id"
         dataSource={filteredRows}
@@ -298,13 +123,14 @@ export const Customers: React.FC = () => {
             render: (id: number) => (
               <Link
                 to={`/admin/customers/${id}`}
-                style={{ textDecoration: "none", color: "#1677ff" }}
-                onMouseEnter={(e) => {
-                  (e.target as HTMLElement).style.textDecoration = "underline";
+                style={{
+                  color: "#1677ff",
+                  fontWeight: 600,
+                  cursor: "pointer",
+                  textDecoration: "none",
+                  transition: "color 0.2s"
                 }}
-                onMouseLeave={(e) => {
-                  (e.target as HTMLElement).style.textDecoration = "none";
-                }}
+                className="customer-id-link"
               >
                 {id}
               </Link>
@@ -313,89 +139,24 @@ export const Customers: React.FC = () => {
           { title: "Tên khách hàng", dataIndex: "name", width: 180 },
           { title: "Email", dataIndex: "email", width: 200 },
           { title: "SĐT", dataIndex: "phone", width: 140 },
+          { title: "Xác minh Email", dataIndex: "email_verified_at", width: 150,
+            render: (v: string | null) => v ? v : <span style={{color:"#aaa"}}>Chưa xác minh</span> },
+          { title: "Điểm", dataIndex: "point", width: 100 },
+          { title: "Hạng", dataIndex: "rank", width: 110 },
           {
-            title: "Giới tính",
-            dataIndex: "gender",
-            width: 100,
-            render: (gender: string) => (
-              <Tag color={gender === "male" ? "blue" : "pink"}>
-                {gender === "male" ? "Nam" : "Nữ"}
-              </Tag>
-            ),
-          },
-          {
-            title: "Ngày sinh",
-            dataIndex: "dob",
-            width: 120,
-            render: (dob: string) => new Date(dob).toLocaleDateString("vi-VN"),
-          },
-          {
-            title: "Vai trò",
-            dataIndex: "roles",
-            width: 150,
-            render: (roles: CustomerDto["roles"]) => (
-              <Space direction="vertical" size={2}>
-                {(roles ?? []).map((role) => (
-                  <Tag key={role.id} color="green">
-                    {role.name}
-                  </Tag>
-                ))}
-              </Space>
-            ),
-          },
-          {
-            title: "Trạng thái",
-            dataIndex: "status",
-            width: 100,
-            render: (status: number) => (
-              <Tag color={status === 1 ? "green" : "red"}>
-                {status === 1 ? "Hoạt động" : "Không hoạt động"}
-              </Tag>
-            ),
-          },
-          {
-            title: "Ngày tạo",
-            dataIndex: "created_at",
-            width: 120,
-            render: (date: string) => {
-              if (!date || isNaN(new Date(date).getTime())) return "";
-              return new Date(date).toLocaleDateString("vi-VN");
-            },
-          },
-          {
-            title: "Thao tác",
-            width: 140,
-            fixed: "right" as const,
-            render: (_, record: CustomerDto) => (
+            title: "Thao tác", width: 120, render: (_, record: CustomerDto) => (
               <Space>
-                <Button
-                  size="small"
-                  type="link"
-                  onClick={() => handleEditClick(record)}
-                >
-                  Sửa
-                </Button>
-                <Button
-                  size="small"
-                  type="link"
-                  danger={record.status === 1}
-                  onClick={() => handleToggleStatus(record)}
-                >
-                  {record.status === 1 ? "Chặn" : "Kích hoạt"}
-                </Button>
+                <Button size="small" type="link" onClick={() => handleEditClick(record)}>Sửa</Button>
               </Space>
-            ),
+            )
           },
         ]}
         pagination={{ pageSize: 10, position: ["bottomCenter"] }}
         bordered
         size="middle"
         loading={loading}
-        scroll={{ x: 1200 }}
+        scroll={{ x: 900 }}
       />
-
-      {/* Tầng 4: Phân trang (dùng pagination của Table) */}
-
       <Drawer
         title={mode === "create" ? "Thêm khách hàng" : "Chỉnh sửa khách hàng"}
         placement="right"
@@ -405,120 +166,30 @@ export const Customers: React.FC = () => {
         extra={
           <Space>
             <Button onClick={handleClose}>Hủy</Button>
-            <Button type="primary" onClick={handleSubmit}>
-              Lưu
-            </Button>
+            <Button type="primary" onClick={handleSubmit}>Lưu</Button>
           </Space>
         }
       >
-        <Form
-          layout="vertical"
-          form={form}
-          initialValues={{
-            name: "",
-            email: "",
-            phone: "",
-            address: "",
-            dob: "",
-            gender: "male",
-            // status bị ẩn khỏi form, không set ở đây
-          }}
-        >
-          <Form.Item
-            name="name"
-            label="Tên khách hàng"
-            rules={[{ required: true, message: "Vui lòng nhập tên" }]}
-          >
+        <Form layout="vertical" form={form} initialValues={{ name: "", email: "", phone: "", email_verified_at: null, point: 0, rank: "Silver" }}>
+          <Form.Item name="name" label="Tên khách hàng" rules={[{ required: true, message: "Vui lòng nhập tên" }]}>
             <Input placeholder="VD: Nguyễn Văn A" />
           </Form.Item>
-          <Form.Item
-            name="email"
-            label="Email"
-            rules={[{ type: "email", message: "Email không hợp lệ" }]}
-          >
+          <Form.Item name="email" label="Email" rules={[{ type: "email", required: true, message: "Vui lòng nhập email hợp lệ" }]}>
             <Input placeholder="name@example.com" />
           </Form.Item>
-          <Form.Item
-            name="phone"
-            label="Số điện thoại"
-            rules={[{ required: true, message: "Vui lòng nhập SĐT" }]}
-          >
+          <Form.Item name="phone" label="Số điện thoại" rules={[{ required: true, message: "Vui lòng nhập SĐT" }]}>
             <Input placeholder="090x-xxx-xxx" />
           </Form.Item>
-          <Form.Item name="address" label="Địa chỉ">
-            <Input.TextArea
-              rows={3}
-              placeholder="Số nhà, đường, quận/huyện, tỉnh/thành"
-            />
+          <Form.Item name="point" label="Điểm" rules={[{ required: true, message: "Nhập điểm tích luỹ" }]}>
+            <Input type="number" min={0} />
           </Form.Item>
-          <Form.Item
-            name="dob"
-            label="Ngày sinh"
-            rules={[{ required: true, message: "Vui lòng chọn ngày sinh" }]}
-          >
-            <DatePicker
-              style={{ width: "100%" }}
-              placeholder="Chọn ngày sinh"
-            />
-          </Form.Item>
-          <Form.Item
-            name="gender"
-            label="Giới tính"
-            rules={[{ required: true, message: "Vui lòng chọn giới tính" }]}
-          >
-            <Select placeholder="Chọn giới tính">
-              <Select.Option value="male">Nam</Select.Option>
-              <Select.Option value="female">Nữ</Select.Option>
+          <Form.Item name="rank" label="Hạng" rules={[{ required: true, message: "Chọn hạng" }]}> 
+            <Select>
+              <Select.Option value="Silver">Silver</Select.Option>
+              <Select.Option value="Gold">Gold</Select.Option>
+              <Select.Option value="Diamond">Diamond</Select.Option>
             </Select>
           </Form.Item>
-          <Form.Item
-            name="password"
-            label="Mật khẩu"
-            rules={[
-              { required: true, message: "Vui lòng nhập mật khẩu" },
-              { min: 6, message: "Mật khẩu phải có ít nhất 6 ký tự" },
-              { max: 32, message: "Tối đa 32 ký tự" },
-              {
-                pattern: /^\S+$/,
-                message: "Mật khẩu không được chứa khoảng trắng",
-              },
-            ]}
-            hasFeedback
-          >
-            <Input.Password
-              placeholder="Nhập mật khẩu..."
-              autoComplete="new-password"
-            />
-          </Form.Item>
-          <Form.Item
-            name="confirmPassword"
-            label="Nhập lại mật khẩu"
-            dependencies={["password"]}
-            hasFeedback
-            rules={[
-              { required: true, message: "Vui lòng xác nhận mật khẩu" },
-              ({ getFieldValue }) => ({
-                validator(_, value) {
-                  if (!value || getFieldValue("password") === value) {
-                    return Promise.resolve();
-                  }
-                  return Promise.reject(new Error("Mật khẩu không khớp"));
-                },
-              }),
-            ]}
-          >
-            <Input.Password
-              placeholder="Nhập lại mật khẩu..."
-              autoComplete="new-password"
-            />
-          </Form.Item>
-          {/* Ẩn field trạng thái (status) trong form */}
-          {/* <Form.Item name="status" label="Trạng thái">
-            <Select placeholder="Chọn trạng thái">
-              <Select.Option value={1}>Hoạt động</Select.Option>
-              <Select.Option value={0}>Không hoạt động</Select.Option>
-            </Select>
-          </Form.Item> */}
         </Form>
       </Drawer>
     </div>

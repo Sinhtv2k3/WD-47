@@ -1,0 +1,10 @@
+.customer-id-link {
+  color: #1677ff;
+  font-weight: 600;
+  text-decoration: none;
+  transition: color 0.2s;
+}
+.customer-id-link:hover {
+  color: #0e57d6;
+  text-decoration: underline;
+}
