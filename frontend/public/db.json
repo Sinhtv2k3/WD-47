@@ -1,39 +1,35 @@
 {
-    "services": [{
-            "name": "nhuộm tóc",
-            "description": "Thay đổi màu tóc, đổi mới bản thân – mỗi lọn tóc là một câu chuyện riêng\n",
-            "price": 100000,
-            "status": "active",
-            "id": "1"
-        },
-        {
-            "name": "cắt tóc",
-            "description": "Một cái cắt tóc mới, một phiên bản mới của chính mình",
-            "price": 100000,
-            "status": "active",
-            "id": "2"
-        },
-        {
-            "name": "gội đầu",
-            "description": "Gội đầu không chỉ là làm sạch, mà là chăm sóc chính mình",
-            "price": 100000,
-            "status": "active",
-            "id": "3"
-        },
-        {
-            "name": "massage",
-            "description": "Gội đầu không chỉ là làm sạch, mà là chăm sóc chính mình",
-            "price": 100000,
-            "status": "active",
-            "id": "4"
-        },
-        {
-            "id": "8c50",
-            "name": "nhuộm tóc1",
-            "description": "323",
-            "price": 13123123,
-            "status": "active"
-        }
-
-    ]
+  "services": [
+    {
+      "id": "1",
+      "name": "Cắt tóc nam",
+      "type": "single",
+      "price": 100000,
+      "status": "active"
+    },
+    {
+      "id": "2",
+      "name": "Combo cắt + gội",
+      "type": "combo",
+      "price": 150000,
+      "status": "active",
+      "comboServices": [
+        1
+      ]
+    }
+  ],
+  "discounts": [
+    {
+      "id": "1",
+      "code": "SALE10",
+      "type": "percent",
+      "value": 10
+    },
+    {
+      "id": "2",
+      "code": "DIS50K",
+      "type": "amount",
+      "value": 50000
+    }
+  ]
 }

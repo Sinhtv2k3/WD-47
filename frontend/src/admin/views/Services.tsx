@@ -10,326 +10,326 @@ import {
   Popconfirm,
   Tag,
   Select,
+  InputNumber,
 } from "antd";
-import type { ServiceRow } from "../models/AdminModel";
 import { AdminController } from "../controllers/AdminController";
+import type { ServiceRow, Discount } from "../models/AdminModel";
 
 export const Services: React.FC = () => {
-  const [form] = Form.useForm();
+  const [form] = Form.useForm<ServiceRow>();
+  const [services, setServices] = useState<ServiceRow[]>([]);
+  const [discounts, setDiscounts] = useState<Discount[]>([]);
   const [open, setOpen] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [services, setServices] = useState<ServiceRowSafe[]>([]);
-  const [filteredServices, setFilteredServices] = useState<ServiceRowSafe[]>([]);
-  const [editingService, setEditingService] = useState<ServiceRowSafe | null>(null);
-  const [searchName, setSearchName] = useState("");
-  const [searchId, setSearchId] = useState("");
+  const [editing, setEditing] = useState<ServiceRow | null>(null);
+  const [type, setType] = useState<"single" | "combo">("single");
 
-   const parseIdToNumber = (raw: any): number | null => {
-    if (raw === null || raw === undefined) return null;
-    if (typeof raw === "number" && Number.isFinite(raw)) return Math.trunc(raw);
-    if (typeof raw === "string") {
-      const trimmed = raw.trim();
-      const direct = Number(trimmed);
-      if (!Number.isNaN(direct) && Number.isFinite(direct)) return Math.trunc(direct);
-      const digits = trimmed.match(/\d+/g)?.join("");
-      if (digits) {
-        const fromDigits = Number(digits);
-        if (!Number.isNaN(fromDigits) && Number.isFinite(fromDigits)) return Math.trunc(fromDigits);
-      }
-    }
-    return null;
-  };
-   const fetchServices = async () => {
-    setLoading(true);
+  // === Load data ===
+  const loadData = async () => {
     try {
-      const data = await AdminController.getServices();
-      const fixed: ServiceRowSafe[] = (data || []).map((item, idx) => ({
-        ...item,
-        numericId: parseIdToNumber(item.id),
-        _tempRowId: idx + 1,
-      }));
-      setServices(fixed);
-      setFilteredServices(fixed);
-    } catch (err) {
-      console.error(err);
-      message.error("Không thể tải danh sách dịch vụ");
-    } finally {
-      setLoading(false);
+      const srv = await AdminController.getServices();
+      let disc: Discount[] = [];
+      try {
+        disc = await AdminController.getDiscounts();
+      } catch {
+        disc = [
+          { id: 1, code: "SALE10", type: "percent", value: 10 },
+          { id: 2, code: "GIAM50K", type: "amount", value: 50000 },
+        ];
+      }
+      setServices(srv);
+      setDiscounts(disc);
+    } catch {
+      message.error("Không thể tải dữ liệu dịch vụ");
     }
   };
+
   useEffect(() => {
-    fetchServices();
+    loadData();
   }, []);
-  const showDrawer = (record?: ServiceRowSafe) => {
+
+  // === Drawer ===
+  const openDrawer = (record?: ServiceRow) => {
+    form.resetFields();
     if (record) {
-      setEditingService(record);
       form.setFieldsValue(record);
+      setEditing(record);
+      setType(record.type);
     } else {
-      setEditingService(null);
-      form.resetFields();
+      setEditing(null);
+      setType("single");
+      form.setFieldsValue({ type: "single", status: "active" });
     }
     setOpen(true);
   };
 
-   const onFinish = async (values: any) => {
+  const closeDrawer = () => {
+    setOpen(false);
+    setEditing(null);
+    form.resetFields();
+  };
+
+  // === Tính giá sau giảm ===
+  const applyDiscount = (price: number, discountId?: number): number => {
+    if (!discountId) return price;
+    const discount = discounts.find((d) => d.id === discountId);
+    if (!discount) return price;
+
+    return discount.type === "percent"
+      ? Math.max(0, price - (price * discount.value) / 100)
+      : Math.max(0, price - discount.value);
+  };
+
+  // === Tính tổng combo ===
+  const calcComboPrice = (selectedIds: number[]) => {
+    const total = services
+      .filter((s) => selectedIds.includes(s.id))
+      .reduce((sum, s) => sum + (s.price || 0), 0);
+    form.setFieldValue("price", total);
+  };
+
+  // === Thêm / Cập nhật ===
+  const handleSubmit = async () => {
+    const values = await form.validateFields();
+    const payload = { ...values };
+
     try {
-      if (values.price !== undefined && values.price !== null) values.price = Number(values.price);
-
-      if (editingService) {
-        
-        const idForApi = editingService.numericId;
-        if (idForApi != null) {
-          await AdminController.updateService(idForApi, values);
-          message.success("Cập nhật dịch vụ thành công");
-        }
-
-    
-        setServices(prev =>
-          prev.map(s =>
-            s.numericId === editingService.numericId || s._tempRowId === editingService._tempRowId
-              ? { ...s, ...values }
-              : s
-          )
-        );
-        setFilteredServices(prev =>
-          prev.map(s =>
-            s.numericId === editingService.numericId || s._tempRowId === editingService._tempRowId
-              ? { ...s, ...values }
-              : s
-          )
-        );
+      if (editing) {
+        await AdminController.updateService(editing.id, payload);
+        message.success("Cập nhật dịch vụ thành công");
       } else {
-       
-        const newService = await AdminController.createService(values);
-        const numericId = parseIdToNumber(newService.id);
-        const tempRowId =
-          services.length > 0
-            ? Math.max(...services.map(s => s._tempRowId)) + 1
-            : 1;
-
-        const fixedService: ServiceRowSafe = {
-          ...newService,
-          numericId,
-          _tempRowId: tempRowId,
-        };
-
-        setServices(prev => [...prev, fixedService]);
-        setFilteredServices(prev => [...prev, fixedService]);
+        await AdminController.addService(payload as ServiceRow);
         message.success("Thêm dịch vụ thành công");
       }
-
-      form.resetFields();
-      setOpen(false);
-    } catch (err) {
-      console.error(err);
+      closeDrawer();
+      loadData();
+    } catch {
       message.error("Lưu dịch vụ thất bại");
     }
   };
 
-   const deleteService = async (service: ServiceRowSafe) => {
+  // === Xóa ===
+  const handleDelete = async (record: ServiceRow) => {
     try {
-      if (service.numericId != null) {
-        await AdminController.updateServiceStatus(service.numericId, "deleted");
-      }
-
-      setServices(prev =>
-        prev.map(s =>
-          s.numericId === service.numericId || s._tempRowId === service._tempRowId
-            ? { ...s, status: "deleted" }
-            : s
-        )
-      );
-      setFilteredServices(prev =>
-        prev.map(s =>
-          s.numericId === service.numericId || s._tempRowId === service._tempRowId
-            ? { ...s, status: "deleted" }
-            : s
-        )
-      );
-
-      message.success("Đã xóa dịch vụ");
-    } catch (err) {
-      console.error(err);
-      message.error("Không thể xóa dịch vụ");
+      await AdminController.deleteService(record.id);
+      message.success(`Đã xóa dịch vụ: ${record.name}`);
+      loadData();
+    } catch {
+      message.error("Xóa thất bại");
     }
   };
-   const toggleStatus = async (service: ServiceRowSafe) => {
-    try {
-      const newStatus = service.status === "active" ? "paused" : "active";
 
-      if (service.numericId != null) {
-        await AdminController.updateServiceStatus(service.numericId, newStatus);
-      }
-
-      setServices(prev =>
-        prev.map(s =>
-          s.numericId === service.numericId || s._tempRowId === service._tempRowId
-            ? { ...s, status: newStatus }
-            : s
-        )
-      );
-      setFilteredServices(prev =>
-        prev.map(s =>
-          s.numericId === service.numericId || s._tempRowId === service._tempRowId
-            ? { ...s, status: newStatus }
-            : s
-        )
-      );
-
-      message.success(newStatus === "active" ? "Đã kích hoạt dịch vụ" : "Đã tạm dừng dịch vụ");
-    } catch (err) {
-      console.error(err);
-      message.error("Không thể thay đổi trạng thái dịch vụ");
-    }
-  };
-   const handleSearch = () => {
-    let filtered = [...services];
-    if (searchName.trim()) {
-      filtered = filtered.filter((s) =>
-        (s.name || "").toLowerCase().includes(searchName.toLowerCase())
-      );
-    }
-    if (searchId.trim()) {
-      const parsed = parseInt(searchId, 10);
-      if (!Number.isNaN(parsed)) {
-        filtered = filtered.filter((s) => s.numericId === parsed);
-      } else {
-        filtered = filtered.filter((s) =>
-          String(s.id).toLowerCase().includes(searchId.toLowerCase())
-        );
-      }
-    }
-    setFilteredServices(filtered);
-  };
-   const columns = [
+  // === Cột bảng ===
+  const columns = [
+    { title: "ID", dataIndex: "id", key: "id" },
+    { title: "Tên dịch vụ", dataIndex: "name", key: "name" },
     {
-      title: "ID",
-      dataIndex: "numericId",
-      key: "id",
-      render: (_: any, row: ServiceRowSafe) => row.numericId ?? row.id ?? "—",
-      sorter: (a: ServiceRowSafe, b: ServiceRowSafe) => {
-        const aId = a.numericId ?? Number.NaN;
-        const bId = b.numericId ?? Number.NaN;
-        if (Number.isNaN(aId) && Number.isNaN(bId)) return a._tempRowId - b._tempRowId;
-        if (Number.isNaN(aId)) return 1;
-        if (Number.isNaN(bId)) return -1;
-        return aId - bId;
+      title: "Loại",
+      dataIndex: "type",
+      render: (t: string) => (
+        <Tag color={t === "combo" ? "purple" : "blue"}>
+          {t === "combo" ? "Combo" : "Đơn"}
+        </Tag>
+      ),
+    },
+    {
+      title: "Giá gốc",
+      dataIndex: "price",
+      render: (v: number) => v.toLocaleString("vi-VN") + "₫",
+    },
+    {
+      title: "Giảm giá",
+      render: (_: any, row: ServiceRow) => {
+        const disc = discounts.find((d) => d.id === row.discount_id);
+        if (!disc) return "-";
+        return disc.type === "percent"
+          ? `${disc.value}%`
+          : `${disc.value.toLocaleString("vi-VN")}₫`;
       },
     },
-    { title: "Tên dịch vụ", dataIndex: "name", key: "name" },
-    { title: "Mô tả", dataIndex: "description", key: "description" },
     {
-      title: "Giá (VNĐ)",
-      dataIndex: "price",
-      key: "price",
-      render: (value: number | undefined) => (typeof value === "number" ? value.toLocaleString() : "—"),
+      title: "Dịch vụ trong combo",
+      render: (_: any, row: ServiceRow) =>
+        row.type === "combo" && row.comboServices?.length
+          ? row.comboServices
+              .map((id) => services.find((s) => s.id === id)?.name || "—")
+              .join(", ")
+          : "-",
+    },
+    {
+      title: "Giá sau giảm",
+      render: (_: any, row: ServiceRow) =>
+        applyDiscount(row.price, row.discount_id).toLocaleString("vi-VN") + "₫",
     },
     {
       title: "Trạng thái",
       dataIndex: "status",
-      key: "status",
-      render: (status: string) => {
-        switch (status) {
-          case "active":
-            return <Tag color="blue">Kích hoạt</Tag>;
-          case "paused":
-            return <Tag color="orange">Tạm dừng</Tag>;
-          case "deleted":
-            return <Tag color="red">Đã xóa</Tag>;
-          default:
-            return <Tag>Không xác định</Tag>;
-        }
-      },
+      render: (s: string) => (
+        <Tag
+          color={s === "active" ? "green" : s === "paused" ? "orange" : "red"}
+        >
+          {s === "active"
+            ? "Hoạt động"
+            : s === "paused"
+            ? "Tạm dừng"
+            : "Đã xóa"}
+        </Tag>
+      ),
     },
     {
       title: "Hành động",
-      key: "action",
-      render: (_: any, record: ServiceRowSafe) => (
+      render: (_: any, record: ServiceRow) => (
         <Space>
-          {record.status !== "deleted" && (
-            <>
-              <Button style={{ color: "green", borderColor: "green" }} onClick={() => showDrawer(record)}>Sửa</Button>
-              <Button style={{ color: "#1677ff", borderColor: "#1677ff" }} onClick={() => toggleStatus(record)}>
-                {record.status === "active" ? "Tạm dừng" : "Kích hoạt"}
-              </Button>
-              <Popconfirm title="Bạn chắc chắn muốn xóa dịch vụ này?" onConfirm={() => deleteService(record)}>
-                <Button danger>Xóa</Button>
-              </Popconfirm>
-            </>
-          )}
+          <Button type="link" onClick={() => openDrawer(record)}>
+            Sửa
+          </Button>
+
+          <Button
+            type="link"
+            onClick={async () => {
+              try {
+                const newStatus =
+                  record.status === "active" ? "paused" : "active";
+                await AdminController.updateService(record.id, {
+                  status: newStatus,
+                });
+                message.success(
+                  newStatus === "active"
+                    ? "Đã bật dịch vụ!"
+                    : "Đã tạm tắt dịch vụ!"
+                );
+                loadData();
+              } catch {
+                message.error("Không thể cập nhật trạng thái");
+              }
+            }}
+          >
+            {record.status === "active" ? "Tắt" : "Bật"}
+          </Button>
+
+          <Popconfirm
+            title="Xóa dịch vụ này?"
+            onConfirm={() => handleDelete(record)}
+          >
+            <Button danger type="link">
+              Xóa
+            </Button>
+          </Popconfirm>
         </Space>
       ),
     },
   ];
-  return (
-    <div>
-      <Space style={{ marginBottom: 16 }}>
-        <Button type="primary" onClick={() => showDrawer()}>Thêm dịch vụ</Button>
-        <Button onClick={fetchServices}>Tải lại</Button>
 
-        <Input
-          placeholder="Tìm kiếm theo tên dịch vụ..."
-          value={searchName}
-          onChange={(e) => setSearchName(e.target.value)}
-          style={{ width: 250 }}
-          onPressEnter={handleSearch}
-        />
-        <Input
-          placeholder="Lọc theo ID..."
-          value={searchId}
-          onChange={(e) => setSearchId(e.target.value)}
-          style={{ width: 150 }}
-          onPressEnter={handleSearch}
-        />
-        <Button onClick={handleSearch}>Tìm kiếm</Button>
+  return (
+    <>
+      <Space style={{ marginBottom: 16 }}>
+        <Button type="primary" onClick={() => openDrawer()}>
+          Thêm dịch vụ
+        </Button>
       </Space>
 
       <Table
         columns={columns}
-        dataSource={filteredServices}
-        loading={loading}
-        rowKey={(row: ServiceRowSafe) =>
-          row.numericId != null
-            ? `id-${row.numericId}`
-            : `tmp-${row._tempRowId}`
-        }
-        pagination={{ pageSize: 8 }}
+        dataSource={services}
+        rowKey="id"
+        pagination={{ pageSize: 6 }}
       />
 
       <Drawer
-        title={editingService ? "Chỉnh sửa dịch vụ" : "Thêm dịch vụ"}
-        onClose={() => setOpen(false)}
+        title={editing ? "Cập nhật dịch vụ" : "Thêm dịch vụ"}
         open={open}
-        width={400}
+        onClose={closeDrawer}
+        width={450}
+        extra={
+          <Space>
+            <Button onClick={closeDrawer}>Hủy</Button>
+            <Button type="primary" onClick={handleSubmit}>
+              Lưu
+            </Button>
+          </Space>
+        }
       >
-        <Form form={form} layout="vertical" onFinish={onFinish}>
-          <Form.Item label="Tên dịch vụ" name="name" rules={[{ required: true, message: "Nhập tên dịch vụ" }]}>
+        <Form layout="vertical" form={form}>
+          <Form.Item
+            label="Tên dịch vụ"
+            name="name"
+            rules={[{ required: true, message: "Nhập tên dịch vụ" }]}
+          >
             <Input />
           </Form.Item>
 
-          <Form.Item label="Mô tả" name="description">
-            <Input.TextArea rows={3} />
+          <Form.Item
+            label="Loại dịch vụ"
+            name="type"
+            rules={[{ required: true, message: "Chọn loại dịch vụ" }]}
+          >
+            <Select
+              onChange={(val: "single" | "combo") => {
+                setType(val);
+                if (val === "combo") form.setFieldValue("price", 0);
+              }}
+              options={[
+                { value: "single", label: "Dịch vụ đơn" },
+                { value: "combo", label: "Dịch vụ combo" },
+              ]}
+            />
           </Form.Item>
 
-          <Form.Item label="Giá" name="price" rules={[{ required: true, message: "Nhập giá dịch vụ" }]}>
-            <Input type="number" />
+          {type === "combo" && (
+            <Form.Item
+              label="Chọn dịch vụ đơn trong combo"
+              name="comboServices"
+              rules={[{ required: true, message: "Chọn ít nhất 1 dịch vụ đơn" }]}
+            >
+              <Select
+                mode="multiple"
+                placeholder="Chọn dịch vụ đơn để tạo combo"
+                options={services
+                  .filter((s) => s.type === "single")
+                  .map((s) => ({ label: s.name, value: s.id }))}
+                onChange={(values) => calcComboPrice(values)}
+              />
+            </Form.Item>
+          )}
+
+          <Form.Item
+            label="Giá (VNĐ)"
+            name="price"
+            rules={[{ required: true, message: "Nhập giá" }]}
+          >
+            <InputNumber
+              style={{ width: "100%" }}
+              min={0}
+              disabled={type === "combo"}
+            />
           </Form.Item>
 
-          <Form.Item label="Trạng thái" name="status" initialValue="active" rules={[{ required: true, message: "Chọn trạng thái" }]}>
-            <Select>
-              <Select.Option value="active">Kích hoạt</Select.Option>
-              <Select.Option value="paused">Tạm dừng</Select.Option>
-              <Select.Option value="deleted">Đã xóa</Select.Option>
-            </Select>
+          <Form.Item label="Mã giảm giá" name="discount_id">
+            <Select
+              allowClear
+              placeholder="Chọn mã giảm giá"
+              options={discounts.map((d) => ({
+                value: d.id,
+                label:
+                  d.type === "percent"
+                    ? `${d.code} - Giảm ${d.value}%`
+                    : `${d.code} - Giảm ${d.value.toLocaleString("vi-VN")}₫`,
+              }))}
+            />
           </Form.Item>
 
-          <Space style={{ display: "flex", justifyContent: "end" }}>
-            <Button onClick={() => setOpen(false)}>Hủy</Button>
-            <Button type="primary" htmlType="submit">Lưu</Button>
-          </Space>
+          <Form.Item label="Trạng thái" name="status" initialValue="active">
+            <Select
+              options={[
+                { value: "active", label: "Hoạt động" },
+                { value: "paused", label: "Tạm dừng" },
+                { value: "deleted", label: "Đã xóa" },
+              ]}
+            />
+          </Form.Item>
         </Form>
       </Drawer>
-    </div>
+    </>
   );
-}
-export default Services
+};
+
+export default Services;

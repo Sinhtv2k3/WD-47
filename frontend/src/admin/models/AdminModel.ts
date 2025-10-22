@@ -1,29 +1,16 @@
-export interface AdminModel {
-  id: string;
-  name: string;
-}
-
-export interface Role {
+export interface ServiceRow {
   id: number;
   name: string;
-  created_at: string;
-  updated_at: string;
-  pivot: {
-    user_id: number;
-    role_id: number;
-  };
-}
-
-
-export interface ServiceRow {
-  id : number;
-  name : string;
+  type: "single" | "combo";
   price: number;
-  dob:string;
-   created_at: string;
-  updated_at: string;
-  deleted_at: string | null;
-  roles: Role[];
-   status: "active" | "paused" | "deleted";
+  status: "active" | "paused" | "deleted";
+  comboServices?: number[];
+  discount_id?: number;
 }
 
+export interface Discount {
+  id: number;
+  code: string;
+  type: "percent" | "amount";
+  value: number;
+}

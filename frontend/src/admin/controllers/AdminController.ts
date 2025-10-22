@@ -1,48 +1,42 @@
-import type { ServiceRow } from "../models/AdminModel";
-const BASE = "/api";
+import type { ServiceRow, Discount } from "../models/AdminModel";
+
+const BASE = "http://localhost:3000";
+
 export class AdminController {
-  // Add controller methods to orchestrate admin view interactions
-  public static initialize(): void { }
-  
-  static async getServices(): Promise<ServiceRow[]> {
+  // === Lấy danh sách dịch vụ ===
+  public static async getServices(): Promise<ServiceRow[]> {
     const res = await fetch(`${BASE}/services`);
-    if (!res.ok) throw new Error("Failed to fetch services");
+    if (!res.ok) throw new Error("Fetch services failed");
     return res.json();
   }
-   static async createService(payload: Partial<ServiceRow>): Promise<ServiceRow> {
-    const res = await fetch(`${BASE}/services`, {
+
+  // === Lấy mã giảm giá ===
+  public static async getDiscounts(): Promise<Discount[]> {
+    const res = await fetch(`${BASE}/discounts`);
+    if (!res.ok) throw new Error("Fetch discounts failed");
+    return res.json();
+  }
+
+  // === Thêm dịch vụ ===
+  public static async addService(data: ServiceRow): Promise<void> {
+    await fetch(`${BASE}/services`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
+      body: JSON.stringify(data),
     });
-    if (!res.ok) throw new Error("Failed to create service");
-    // backend phải trả về service mới với id
-    return res.json();
   }
-    static async updateService(id: number, payload: Partial<ServiceRow>): Promise<void> {
-    const res = await fetch(`${BASE}/services/${id}`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-    if (!res.ok) throw new Error("Failed to update service");
-  }
-   static async updateServiceStatus(id: number, status: string): Promise<void> {
-    const res = await fetch(`${BASE}/services/${id}`, {
+
+  // === Cập nhật dịch vụ ===
+  public static async updateService(id: number, data: Partial<ServiceRow>): Promise<void> {
+    await fetch(`${BASE}/services/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ status }),
+      body: JSON.stringify(data),
     });
-    if (!res.ok) throw new Error("Failed to update status");
   }
-   static async deleteService(id: number): Promise<void> {
-    const res = await fetch(`${BASE}/services/${id}`, {
-      method: "DELETE",
-    });
-    if (!res.ok) throw new Error("Failed to delete service");
+
+  // === Xóa dịch vụ ===
+  public static async deleteService(id: number): Promise<void> {
+    await fetch(`${BASE}/services/${id}`, { method: "DELETE" });
   }
 }
-
-export default AdminController;
-
-
