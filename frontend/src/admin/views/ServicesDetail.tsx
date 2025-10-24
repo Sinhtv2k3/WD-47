@@ -17,7 +17,7 @@ import {
 import { AdminController } from "../controllers/AdminController";
 import type { ServiceDetail, Discount } from "../models/AdminModel";
 
-const ServiceDetailPage: React.FC = () => {
+const ServiceDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
 
@@ -120,7 +120,9 @@ const ServiceDetailPage: React.FC = () => {
             {service.type === "combo" ? "Combo" : "Đơn"}
           </Tag>
         </Descriptions.Item>
-        <Descriptions.Item label="Giá gốc">{service.price.toLocaleString("vi-VN")}₫</Descriptions.Item>
+        <Descriptions.Item label="Giá gốc">
+          {service.price.toLocaleString("vi-VN")}₫
+        </Descriptions.Item>
         <Descriptions.Item label="Mã giảm giá">
           {disc
             ? disc.type === "percent"
@@ -156,10 +158,14 @@ const ServiceDetailPage: React.FC = () => {
           </Tag>
         </Descriptions.Item>
         <Descriptions.Item label="Ngày tạo">
-          {service.created_at ? new Date(service.created_at).toLocaleString("vi-VN") : "—"}
+          {service.created_at
+            ? new Date(service.created_at).toLocaleString("vi-VN")
+            : "—"}
         </Descriptions.Item>
         <Descriptions.Item label="Cập nhật">
-          {service.updated_at ? new Date(service.updated_at).toLocaleString("vi-VN") : "—"}
+          {service.updated_at
+            ? new Date(service.updated_at).toLocaleString("vi-VN")
+            : "—"}
         </Descriptions.Item>
       </Descriptions>
 
@@ -222,4 +228,4 @@ const ServiceDetailPage: React.FC = () => {
   );
 };
 
-export default ServiceDetailPage;
+export default ServiceDetail;
