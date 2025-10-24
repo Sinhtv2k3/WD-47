@@ -6,6 +6,7 @@ export interface ServiceRow {
   status: "active" | "paused" | "deleted";
   comboServices?: number[];
   discount_id?: number;
+  images?: string[];
 }
 
 export interface Discount {
@@ -13,4 +14,9 @@ export interface Discount {
   code: string;
   type: "percent" | "amount";
   value: number;
+}
+
+export interface  ServiceDetail extends ServiceRow {
+  created_at?: string;
+  updated_at?: string;
 }

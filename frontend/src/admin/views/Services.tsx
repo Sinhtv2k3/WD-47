@@ -1,45 +1,54 @@
 import React, { useEffect, useState } from "react";
 import {
+  Table,
   Button,
   Drawer,
   Form,
   Input,
-  Space,
-  Table,
-  message,
-  Popconfirm,
-  Tag,
-  Select,
   InputNumber,
+  Select,
+  Space,
+  Tag,
+  message,
+  Typography,
+  Upload,
 } from "antd";
+import { UploadOutlined } from "@ant-design/icons";
+import { useNavigate } from "react-router-dom";
+
 import { AdminController } from "../controllers/AdminController";
 import type { ServiceRow, Discount } from "../models/AdminModel";
 
+const { Text } = Typography;
+
 export const Services: React.FC = () => {
-  const [form] = Form.useForm<ServiceRow>();
-  const [services, setServices] = useState<ServiceRow[]>([]);
-  const [discounts, setDiscounts] = useState<Discount[]>([]);
+  const [rows, setRows] = useState<ServiceRow[]>([]);
+  const [loading, setLoading] = useState(false);
   const [open, setOpen] = useState(false);
-  const [editing, setEditing] = useState<ServiceRow | null>(null);
-  const [type, setType] = useState<"single" | "combo">("single");
+  const [mode, setMode] = useState<"create" | "edit">("create");
+  const [editingService, setEditingService] = useState<ServiceRow | null>(null);
+  const [discounts, setDiscounts] = useState<Discount[]>([]);
+  const [form] = Form.useForm<ServiceRow>();
+  const navigate = useNavigate();
+  const [fileList, setFileList] = useState<any[]>([]);
+  const [searchName, setSearchName] = useState("");
+  const [searchType, setSearchType] = useState("");
 
   // === Load data ===
   const loadData = async () => {
+    setLoading(true);
     try {
-      const srv = await AdminController.getServices();
-      let disc: Discount[] = [];
-      try {
-        disc = await AdminController.getDiscounts();
-      } catch {
-        disc = [
-          { id: 1, code: "SALE10", type: "percent", value: 10 },
-          { id: 2, code: "GIAM50K", type: "amount", value: 50000 },
-        ];
-      }
-      setServices(srv);
+      const [services, disc] = await Promise.all([
+        AdminController.getServices(),
+        AdminController.getDiscounts().catch(() => []),
+      ]);
+      setRows(services);
       setDiscounts(disc);
-    } catch {
-      message.error("Không thể tải dữ liệu dịch vụ");
+    } catch (err) {
+      console.error(err);
+      message.error("Không thể tải danh sách dịch vụ");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -47,288 +56,242 @@ export const Services: React.FC = () => {
     loadData();
   }, []);
 
-  // === Drawer ===
-  const openDrawer = (record?: ServiceRow) => {
+  const handleToggleStatus = async (record: ServiceRow) => {
+  try {
+    // Chuyển trạng thái
+    const newStatus = record.status === "active" ? "paused" : "active";
+    await AdminController.updateService(record.id, { status: newStatus });
+    message.success("Cập nhật trạng thái thành công");
+    setRows(prev =>
+      prev.map(r => (r.id === record.id ? { ...r, status: newStatus } : r))
+    );
+  } catch {
+    message.error("Cập nhật trạng thái thất bại");
+  }
+};
+
+  // === Filter ===
+  const filteredRows = rows.filter(r => {
+    if (searchName && !r.name.toLowerCase().includes(searchName.toLowerCase())) return false;
+    if (searchType && r.type !== searchType) return false;
+    return true;
+  });
+
+  // === Apply discount ===
+  const applyDiscount = (price: number, discountId?: number) => {
+    if (!discountId) return price;
+    const disc = discounts.find(d => d.id === discountId);
+    if (!disc) return price;
+    return disc.type === "percent"
+      ? Math.max(0, price - (price * disc.value) / 100)
+      : Math.max(0, price - disc.value);
+  };
+
+  const handleAdd = () => {
     form.resetFields();
-    if (record) {
-      form.setFieldsValue(record);
-      setEditing(record);
-      setType(record.type);
-    } else {
-      setEditing(null);
-      setType("single");
-      form.setFieldsValue({ type: "single", status: "active" });
-    }
+    setMode("create");
+    setEditingService(null);
     setOpen(true);
   };
 
-  const closeDrawer = () => {
-    setOpen(false);
-    setEditing(null);
-    form.resetFields();
+  const handleEdit = (record: ServiceRow) => {
+    form.setFieldsValue(record);
+    setMode("edit");
+    setEditingService(record);
+    setOpen(true);
   };
 
-  // === Tính giá sau giảm ===
-  const applyDiscount = (price: number, discountId?: number): number => {
-    if (!discountId) return price;
-    const discount = discounts.find((d) => d.id === discountId);
-    if (!discount) return price;
-
-    return discount.type === "percent"
-      ? Math.max(0, price - (price * discount.value) / 100)
-      : Math.max(0, price - discount.value);
-  };
-
-  // === Tính tổng combo ===
-  const calcComboPrice = (selectedIds: number[]) => {
-    const total = services
-      .filter((s) => selectedIds.includes(s.id))
-      .reduce((sum, s) => sum + (s.price || 0), 0);
-    form.setFieldValue("price", total);
-  };
-
-  // === Thêm / Cập nhật ===
-  const handleSubmit = async () => {
-    const values = await form.validateFields();
-    const payload = { ...values };
-
+  const handleDelete = async (id: number) => {
     try {
-      if (editing) {
-        await AdminController.updateService(editing.id, payload);
-        message.success("Cập nhật dịch vụ thành công");
-      } else {
-        await AdminController.addService(payload as ServiceRow);
-        message.success("Thêm dịch vụ thành công");
-      }
-      closeDrawer();
-      loadData();
-    } catch {
-      message.error("Lưu dịch vụ thất bại");
-    }
-  };
-
-  // === Xóa ===
-  const handleDelete = async (record: ServiceRow) => {
-    try {
-      await AdminController.deleteService(record.id);
-      message.success(`Đã xóa dịch vụ: ${record.name}`);
-      loadData();
+      await AdminController.deleteService(id);
+      setRows(prev => prev.filter(r => r.id !== id));
+      message.success("Xóa dịch vụ thành công");
     } catch {
       message.error("Xóa thất bại");
     }
   };
 
-  // === Cột bảng ===
-  const columns = [
-    { title: "ID", dataIndex: "id", key: "id" },
-    { title: "Tên dịch vụ", dataIndex: "name", key: "name" },
-    {
-      title: "Loại",
-      dataIndex: "type",
-      render: (t: string) => (
-        <Tag color={t === "combo" ? "purple" : "blue"}>
-          {t === "combo" ? "Combo" : "Đơn"}
-        </Tag>
-      ),
-    },
-    {
-      title: "Giá gốc",
-      dataIndex: "price",
-      render: (v: number) => v.toLocaleString("vi-VN") + "₫",
-    },
-    {
-      title: "Giảm giá",
-      render: (_: any, row: ServiceRow) => {
-        const disc = discounts.find((d) => d.id === row.discount_id);
-        if (!disc) return "-";
-        return disc.type === "percent"
-          ? `${disc.value}%`
-          : `${disc.value.toLocaleString("vi-VN")}₫`;
-      },
-    },
-    {
-      title: "Dịch vụ trong combo",
-      render: (_: any, row: ServiceRow) =>
-        row.type === "combo" && row.comboServices?.length
-          ? row.comboServices
-              .map((id) => services.find((s) => s.id === id)?.name || "—")
-              .join(", ")
-          : "-",
-    },
-    {
-      title: "Giá sau giảm",
-      render: (_: any, row: ServiceRow) =>
-        applyDiscount(row.price, row.discount_id).toLocaleString("vi-VN") + "₫",
-    },
-    {
-      title: "Trạng thái",
-      dataIndex: "status",
-      render: (s: string) => (
-        <Tag
-          color={s === "active" ? "green" : s === "paused" ? "orange" : "red"}
-        >
-          {s === "active"
-            ? "Hoạt động"
-            : s === "paused"
-            ? "Tạm dừng"
-            : "Đã xóa"}
-        </Tag>
-      ),
-    },
-    {
-      title: "Hành động",
-      render: (_: any, record: ServiceRow) => (
-        <Space>
-          <Button type="link" onClick={() => openDrawer(record)}>
-            Sửa
-          </Button>
-
-          <Button
-            type="link"
-            onClick={async () => {
-              try {
-                const newStatus =
-                  record.status === "active" ? "paused" : "active";
-                await AdminController.updateService(record.id, {
-                  status: newStatus,
-                });
-                message.success(
-                  newStatus === "active"
-                    ? "Đã bật dịch vụ!"
-                    : "Đã tạm tắt dịch vụ!"
-                );
-                loadData();
-              } catch {
-                message.error("Không thể cập nhật trạng thái");
-              }
-            }}
-          >
-            {record.status === "active" ? "Tắt" : "Bật"}
-          </Button>
-
-          <Popconfirm
-            title="Xóa dịch vụ này?"
-            onConfirm={() => handleDelete(record)}
-          >
-            <Button danger type="link">
-              Xóa
-            </Button>
-          </Popconfirm>
-        </Space>
-      ),
-    },
-  ];
+  const handleSubmit = async () => {
+    try {
+      const values = await form.validateFields();
+      if (mode === "create") {
+        await AdminController.addService(values as ServiceRow);
+        message.success("Thêm dịch vụ thành công");
+      } else if (mode === "edit" && editingService) {
+        await AdminController.updateService(editingService.id, values as Partial<ServiceRow>);
+        message.success("Cập nhật thành công");
+      }
+      setOpen(false);
+      loadData();
+    } catch {
+      message.error("Lưu thất bại");
+    }
+  };
 
   return (
-    <>
+    <div>
       <Space style={{ marginBottom: 16 }}>
-        <Button type="primary" onClick={() => openDrawer()}>
-          Thêm dịch vụ
-        </Button>
+        <Input
+          placeholder="Tên dịch vụ"
+          value={searchName}
+          onChange={e => setSearchName(e.target.value)}
+        />
+        <Select
+          placeholder="Loại"
+          allowClear
+          style={{ width: 150 }}
+          value={searchType}
+          onChange={v => setSearchType(v)}
+        >
+          <Select.Option value="single">Đơn</Select.Option>
+          <Select.Option value="combo">Combo</Select.Option>
+        </Select>
+        <Button onClick={() => { setSearchName(""); setSearchType(""); }}>Xóa bộ lọc</Button>
+        <Button type="primary" onClick={handleAdd}>Thêm dịch vụ</Button>
       </Space>
 
       <Table
-        columns={columns}
-        dataSource={services}
+        dataSource={filteredRows}
         rowKey="id"
-        pagination={{ pageSize: 6 }}
+        loading={loading}
+        scroll={{ x: 900 }}
+        columns={[
+          { title: "ID", dataIndex: "id", width: 60 },
+          {
+            title: "Tên dịch vụ",
+            dataIndex: "name",
+            render: (text: string, record: ServiceRow) => (
+              <Button type="link" onClick={() => navigate(`/admin/services/${record.id}`)}>
+                {text}
+              </Button>
+            ),
+          },
+          {
+            title: "Loại",
+            dataIndex: "type",
+            render: (v: string) => (
+              <Tag color={v === "combo" ? "purple" : "blue"}>
+                {v === "combo" ? "Combo" : "Đơn"}
+              </Tag>
+            ),
+          },
+          {
+            title: "Giá (VNĐ)",
+            dataIndex: "price",
+            render: (_, record) => {
+              const final = applyDiscount(record.price, record.discount_id);
+              return (
+                <span>
+                  {record.price.toLocaleString()}₫ → <Text strong>{final.toLocaleString()}₫</Text>
+                </span>
+              );
+            },
+          },
+          {
+            title: "Mã giảm giá",
+            dataIndex: "discount_id",
+            render: (id?: number) => {
+              const disc = discounts.find(d => d.id === id);
+              return disc ? disc.code : "Không";
+            },
+          },
+          {
+            title: "Trạng thái",
+            dataIndex: "status",
+            render: (status: "active" | "paused" | "deleted") => {
+              let color = "green";
+              let text = "Hoạt động";
+              if (status === "paused") {
+                color = "orange";
+                text = "Tạm dừng";
+              } else if (status === "deleted") {
+                color = "red";
+                text = "Đã xóa";
+              }
+              return <Tag color={color}>{text}</Tag>;
+            },
+          },
+          {
+            title: "Thao tác",
+            render: (_: any, record: ServiceRow) => (
+              <Space>
+                <Button type="link" onClick={() => handleEdit(record)}>Sửa</Button>
+                <Button type="link" danger onClick={() => handleDelete(record.id)}>Xóa</Button>
+                 <Button
+        type="link"
+        onClick={() => handleToggleStatus(record)}
+      >
+        {record.status === "active" ? "Tạm dừng" : "Kích hoạt"}
+      </Button>
+              </Space>
+            ),
+          },
+        ]}
+        pagination={{ pageSize: 10 }}
       />
 
       <Drawer
-        title={editing ? "Cập nhật dịch vụ" : "Thêm dịch vụ"}
+        title={mode === "create" ? "Thêm dịch vụ" : "Chỉnh sửa dịch vụ"}
+        width={400}
+        onClose={() => setOpen(false)}
         open={open}
-        onClose={closeDrawer}
-        width={450}
-        extra={
+        footer={
           <Space>
-            <Button onClick={closeDrawer}>Hủy</Button>
-            <Button type="primary" onClick={handleSubmit}>
-              Lưu
-            </Button>
+            <Button onClick={() => setOpen(false)}>Hủy</Button>
+            <Button type="primary" onClick={handleSubmit}>Lưu</Button>
           </Space>
         }
       >
         <Form layout="vertical" form={form}>
-          <Form.Item
-            label="Tên dịch vụ"
-            name="name"
-            rules={[{ required: true, message: "Nhập tên dịch vụ" }]}
-          >
+          <Form.Item label="Ảnh dịch vụ">
+            <Upload
+              beforeUpload={() => false}
+              fileList={fileList}
+              onChange={({ fileList }) => setFileList(fileList)}
+              accept="image/*"
+            >
+              <Button icon={<UploadOutlined />}>Chọn ảnh</Button>
+            </Upload>
+          </Form.Item>
+          <Form.Item label="Tên dịch vụ" name="name" rules={[{ required: true }]}>
             <Input />
           </Form.Item>
-
-          <Form.Item
-            label="Loại dịch vụ"
-            name="type"
-            rules={[{ required: true, message: "Chọn loại dịch vụ" }]}
-          >
-            <Select
-              onChange={(val: "single" | "combo") => {
-                setType(val);
-                if (val === "combo") form.setFieldValue("price", 0);
-              }}
-              options={[
-                { value: "single", label: "Dịch vụ đơn" },
-                { value: "combo", label: "Dịch vụ combo" },
-              ]}
-            />
+          <Form.Item label="Loại" name="type" rules={[{ required: true }]}>
+            <Select>
+              <Select.Option value="single">Đơn</Select.Option>
+              <Select.Option value="combo">Combo</Select.Option>
+            </Select>
           </Form.Item>
-
-          {type === "combo" && (
-            <Form.Item
-              label="Chọn dịch vụ đơn trong combo"
-              name="comboServices"
-              rules={[{ required: true, message: "Chọn ít nhất 1 dịch vụ đơn" }]}
-            >
-              <Select
-                mode="multiple"
-                placeholder="Chọn dịch vụ đơn để tạo combo"
-                options={services
-                  .filter((s) => s.type === "single")
-                  .map((s) => ({ label: s.name, value: s.id }))}
-                onChange={(values) => calcComboPrice(values)}
-              />
-            </Form.Item>
-          )}
-
-          <Form.Item
-            label="Giá (VNĐ)"
-            name="price"
-            rules={[{ required: true, message: "Nhập giá" }]}
-          >
-            <InputNumber
-              style={{ width: "100%" }}
-              min={0}
-              disabled={type === "combo"}
-            />
+          <Form.Item label="Giá (VNĐ)" name="price" rules={[{ required: true }]}>
+            <InputNumber style={{ width: "100%" }} min={0} />
           </Form.Item>
-
           <Form.Item label="Mã giảm giá" name="discount_id">
             <Select
               allowClear
               placeholder="Chọn mã giảm giá"
-              options={discounts.map((d) => ({
+              options={discounts.map(d => ({
                 value: d.id,
-                label:
-                  d.type === "percent"
-                    ? `${d.code} - Giảm ${d.value}%`
-                    : `${d.code} - Giảm ${d.value.toLocaleString("vi-VN")}₫`,
+                label: d.type === "percent"
+                  ? `${d.code} - ${d.value}%`
+                  : `${d.code} - Giảm ${d.value.toLocaleString()}₫`
               }))}
             />
           </Form.Item>
-
-          <Form.Item label="Trạng thái" name="status" initialValue="active">
-            <Select
-              options={[
-                { value: "active", label: "Hoạt động" },
-                { value: "paused", label: "Tạm dừng" },
-                { value: "deleted", label: "Đã xóa" },
-              ]}
-            />
+          <Form.Item label="Trạng thái" name="status" rules={[{ required: true }]}>
+            <Select>
+              <Select.Option value="active">Hoạt động</Select.Option>
+              <Select.Option value="paused">Tạm dừng</Select.Option>
+              <Select.Option value="deleted">Đã xóa</Select.Option>
+            </Select>
           </Form.Item>
+          {form.getFieldValue("type") === "combo" && (
+            <Form.Item label="Dịch vụ trong combo" name="comboServices">
+              <Input placeholder="Nhập ID dịch vụ, cách nhau bằng dấu , " />
+            </Form.Item>
+          )}
         </Form>
       </Drawer>
-    </>
+    </div>
   );
 };
 

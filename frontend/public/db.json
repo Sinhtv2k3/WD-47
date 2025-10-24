@@ -5,17 +5,36 @@
       "name": "Cắt tóc nam",
       "type": "single",
       "price": 100000,
-      "status": "active"
+      "status": "active",
+      "discount_id": "2"
     },
     {
       "id": "2",
       "name": "Combo cắt + gội",
       "type": "combo",
-      "price": 150000,
+      "price": 200000,
       "status": "active",
       "comboServices": [
-        1
-      ]
+        "47ac",
+        "1"
+      ],
+      "discount_id": "2"
+    },
+    {
+      "id": "47ac",
+      "name": "gội đầu",
+      "type": "single",
+      "price": 100000,
+      "discount_id": "2",
+      "status": "active"
+    },
+    {
+      "id": "165a",
+      "name": "nhuộm tóc",
+      "type": "single",
+      "price": 100000,
+      "discount_id": "1",
+      "status": "active"
     }
   ],
   "discounts": [
